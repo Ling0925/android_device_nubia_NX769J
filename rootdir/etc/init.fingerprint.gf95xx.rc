@@ -1,0 +1,24 @@
+#
+# Goodix fingerprint
+#
+on post-fs-data
+    chmod 0770 /dev/goodix_fp
+    chown system system /dev/goodix_fp
+    mkdir /data/vendor/goodix 0770 system system
+    mkdir /mnt/vendor/persist/fingerprint 0770 system system
+    mkdir /mnt/vendor/persist/goodix 0770 system system
+
+on boot
+    chmod 0770 /dev/goodix_fp
+    chown system system /dev/goodix_fp
+    mkdir /data/vendor/goodix 0770 system system
+    mkdir /mnt/vendor/persist/fingerprint 0770 system system
+    mkdir /mnt/vendor/persist/goodix 0770 system system
+
+service ztecmd /vendor/bin/hw/android.hardware.biometrics.fingerprint.aidl-service
+    class late_start
+    user system
+    group system input
+    writepid /dev/cpuset/top-app/tasks
+    #disabled
+

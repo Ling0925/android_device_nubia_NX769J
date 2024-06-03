@@ -1,0 +1,642 @@
+# Copyright (C) 2012 ZTE by RUIJIAGUI
+#
+# IMPORTANT: Do not create world writable files or directories.
+# This is a common source of Android security bugs.
+#
+on early-init
+    mkdir /dev/input 0755 root root
+
+on init
+    mkdir /dev/ztelogs 0771 root system
+    mkdir /dev/ztelogs/qrtr 0771 vendor_qrtr system
+    chmod 0771 /dev/ztelogs
+    #zte add for usb otg disable_host_mode
+    chown system system /sys/module/dwc3_msm/parameters/disable_host_mode
+    chown system system /sys/devices/platform/soc/a600000.ssusb/host_mode
+
+    mkdir /dev/blkio/system-background
+    chown system system /dev/blkio/system-background
+    chown system system /dev/blkio/system-background/tasks
+    chmod 0664 /dev/blkio/system-background
+    chmod 0664 /dev/blkio/system-background/tasks
+    write /dev/blkio/system-background/blkio.bfq.weight 20
+
+    # TGPA
+    mkdir /dev/cpuset/littlecluster
+    copy /dev/cpuset/cpus /dev/cpuset/littlecluster/cpus
+    copy /dev/cpuset/mems /dev/cpuset/littlecluster/mems
+    chown system system /dev/cpuset/littlecluster
+    chmod 0755 /dev/cpuset/littlecluster
+    chown system system /dev/cpuset/littlecluster/tasks
+    chmod 0664 /dev/cpuset/littlecluster/tasks
+    write /dev/cpuset/littlecluster/cpus 0-3
+
+    mkdir /dev/cpuset/bigcluster
+    copy /dev/cpuset/cpus /dev/cpuset/bigcluster/cpus
+    copy /dev/cpuset/mems /dev/cpuset/bigcluster/mems
+    chown system system /dev/cpuset/bigcluster
+    chmod 0755 /dev/cpuset/bigcluster
+    chown system system /dev/cpuset/bigcluster/tasks
+    chmod 0664 /dev/cpuset/bigcluster/tasks
+    write /dev/cpuset/bigcluster/cpus 4-7
+
+on brd-post-fs
+    #add for after-sale-requirement
+#    wait /sys/class/power_supply/bcl/charge_full
+    mkdir /mnt/vendor/persist/zstats 0755 system system
+    chown system system /sys/class/power_supply/bcl/serial_number
+    chown system system /sys/class/power_supply/bcl/authentic
+    chown system system /sys/class/power_supply/bcl/charge_now
+    chown system system /sys/class/power_supply/bcl/current_avg
+    chown system system /sys/class/power_supply/bcl/charge_full
+    chown system system /sys/class/power_supply/bcl/charge_full_design
+    chown system system /mnt/vendor/persist/zstats/capacity.dat
+    chown system system /mnt/vendor/persist/zstats/charging.dat
+    chown system system /mnt/vendor/persist/zstats/uptime.dat
+    chown system system /mnt/vendor/persist/zstats/cycle.dat
+    chown system system /sys/module/zte_misc/parameters/policy_enable
+    chmod 0664  /mnt/vendor/persist/zstats/capacity.dat
+    chmod 0664  /mnt/vendor/persist/zstats/uptime.dat
+    chmod 0664  /mnt/vendor/persist/zstats/charging.dat
+    chmod 0664  /mnt/vendor/persist/zstats/cycle.dat
+    chmod 0664  /sys/module/zte_misc/parameters/policy_enable
+
+on late-init
+    trigger brd-post-fs
+    class_start brd_normal
+    write /sys/module/zte_misc/parameters/screen_on 1
+    chown root system /sys/block/zram0/writeback_limit
+    chmod 0664 /sys/block/zram0/writeback_limit
+    chown root system /sys/block/zram0/writeback_limit_enable
+    chmod 0664 /sys/block/zram0/writeback_limit_enable
+
+on charger
+    wait /dev/block/platform/soc/${ro.boot.bootdevice}
+    symlink /dev/block/platform/soc/${ro.boot.bootdevice} /dev/block/bootdevice
+
+    #mount persist
+    mkdir /mnt/vendor/persist 0755 system system
+
+    wait /dev/block/bootdevice/by-name/persist
+    mount ext4 /dev/block/bootdevice/by-name/persist /mnt/vendor/persist noatime nosuid nodev barrier=1
+
+    trigger brd-post-fs
+    # Set max_volt_mv for qcom charging binary
+    setprop persist.vendor.chg.max_volt_mv 9000
+    class_start brd_charger
+
+on property:persist.sys.ztelog.enable=1 && property:ro.vendor.feature.zte_feature_charger_adsp=true
+    wait /sys/class/qcom-battery/adsp_debug
+    chown root system /sys/class/qcom-battery/adsp_debug
+    chmod 0664 /sys/class/qcom-battery/adsp_debug
+
+on property:ro.vendor.feature.zte_feature_charger_adsp=true
+    wait /sys/class/qcom-battery/battery_charging_enabled
+    chown root system /sys/class/qcom-battery/battery_charging_enabled
+    chmod 0664 /sys/class/qcom-battery/battery_charging_enabled
+
+on property:ro.vendor.feature.zte_feature_charger_adsp=true
+    wait /sys/class/qcom-battery/charge_mode
+    chown root system /sys/class/qcom-battery/charge_mode
+    chmod 0664 /sys/class/qcom-battery/charge_mode
+
+on property:persist.sys.smooth.soc=1
+    wait /sys/class/qcom-battery/ssoc_full
+    chown root system /sys/class/qcom-battery/ssoc_full
+    chmod 0664 /sys/class/qcom-battery/ssoc_full
+
+    wait /sys/class/qcom-battery/rsoc_full
+    chown root system /sys/class/qcom-battery/rsoc_full
+    chmod 0664 /sys/class/qcom-battery/rsoc_full
+
+on property:sys.boot_completed=1
+    chmod 0755 /sys/kernel/tracing
+
+on boot
+ # add for CHG related interface permissions
+    chmod 0660 /sys/class/power_supply/battery/charging_enabled
+    chown root system sys/class/power_supply/battery/charging_enabled
+    chmod 0660 /sys/module/zte_misc/parameters/enable_to_shutdown
+    chown root system /sys/module/zte_misc/parameters/enable_to_shutdown
+    chmod 0660 /sys/module/zte_misc/parameters/charging_enabled
+    chown root system /sys/module/zte_misc/parameters/charging_enabled
+    chmod 0660 /sys/module/zte_misc/parameters/poweroff_bs
+    chown root system /sys/module/zte_misc/parameters/poweroff_bs
+    chmod 0660 /sys/module/zte_misc/parameters/factory_mode
+    chown root system /sys/module/zte_misc/parameters/factory_mode
+    chmod 0660 /sys/class/power_supply/battery/voltage_max_design
+    chown root system sys/class/power_supply/battery/voltage_max_design
+    chmod 0660 /sys/class/power_supply/battery/voltage_min_design
+    chown root system sys/class/power_supply/battery/voltage_min_design
+    chmod 0660 /sys/module/zte_misc/parameters/store_mode
+    chown root system /sys/module/zte_misc/parameters/store_mode
+
+#add for charging policy
+    chown system system /sys/module/zte_misc/parameters/demo_charging_policy
+    chown system system /sys/module/zte_misc/parameters/expired_charging_policy
+    chown system system /sys/module/zte_misc/parameters/screen_on
+    chown system system /sys/module/zte_misc/parameters/super_charge_mode
+    chown system system /sys/class/qcom-battery/screen_is_on
+    chown system system /sys/module/zte_misc/parameters/wls_nu_cep
+    chown system system /sys/module/zte_misc/parameters/wls_nu_iout
+    chown system system /sys/module/zte_misc/parameters/wls_nu_usbtype
+    chown system system /sys/module/zte_misc/parameters/wls_nu_vout
+    chown system system /sys/module/zte_misc/parameters/wls_nu_vrect
+    chown system system /sys/module/zte_misc/parameters/wls_boost_en
+    chown system system /sys/module/zte_misc/parameters/wls_nu_fw_update
+    chown system system /sys/module/zte_misc/parameters/wls_nu_ver
+    chown system system /sys/module/zte_misc/parameters/wls_nu_sleep
+
+    #add for battery charging cycle counter
+    chown system system /persist/charging_cycles
+    chmod 0664 /persist/charging_cycles
+    #add for lcd node by ZTE
+    chown system system /proc/driver/lcd_hbm
+    chmod 0666 /proc/driver/lcd_hbm
+    chown system system /proc/driver/lcd_hdr
+    chmod 0666 /proc/driver/lcd_hdr
+    chown system system /proc/driver/lcd_aod_bl
+    chmod 0666 /proc/driver/lcd_aod_bl
+    chown system system /proc/driver/lcd_color_gamut
+    chmod 0666 /proc/driver/lcd_color_gamut
+    chown system system /proc/driver/lcd_fps
+    chmod 0666 /proc/driver/lcd_fps
+    chown system system /proc/driver/lcd_acl
+    chmod 0666 /proc/driver/lcd_acl
+    chown system system /proc/driver/lcd_global_hbm
+    chmod 0666 /proc/driver/lcd_global_hbm
+    chown system system /proc/driver/lcd_fod_unlock_status
+    chmod 0666 /proc/driver/lcd_fod_unlock_status
+    chown system system /proc/driver/lcd_dbi_status
+    chmod 0666 /proc/driver/lcd_dbi_status
+    chown system system /proc/driver/lcd_fgp
+    chmod 0666 /proc/driver/lcd_fgp
+    chown system system /proc/driver/lcd_elvdd
+    chmod 0666 /proc/driver/lcd_elvdd
+    chown system system /proc/driver/lcd_lspot
+    chmod 0666 /proc/driver/lcd_lspot
+    chown system system /proc/driver/lcd_thermal_max_brightness
+    chmod 0666 /proc/driver/lcd_thermal_max_brightness
+    chown system system /proc/driver/lcd_gesture
+    chmod 0666 /proc/driver/lcd_gesture
+    chown system system /proc/driver/lcd_bl_limit
+    chmod 0666 /proc/driver/lcd_bl_limit
+    chown system system /proc/driver/lcd_lp
+    chmod 0666 /proc/driver/lcd_lp
+
+    # add for ignor sddump control
+    chown system system /sys/module/msm_poweroff/parameters/ignore_sd_dump
+    chmod 0664 /sys/module/msm_poweroff/parameters/ignore_sd_dump
+
+    # add for ramdump report
+    chown system system /sys/module/subsystem_restart/parameters/sddump_status
+    chmod 0664 /sys/module/subsystem_restart/parameters/sddump_status
+
+    # add for secureemode
+    chmod 0644 /sys/module/audit/parameters/audit_printk_no_ratelimit
+    chown system system /sys/module/audit/parameters/audit_printk_no_ratelimit
+
+    #
+    # Support for fuse status by ZTE_BOOT
+    #
+    insmod /vendor/lib/modules/ftmmod.ko
+    # add for fingerprint send event
+    chown system system /proc/fingerprint/goodix_nav_event
+    chmod 0644 /proc/fingerprint/goodix_nav_event
+
+    chown system input /dev/input/event0
+    chown system input /dev/input/event1
+    chown system input /dev/input/event2
+    chown system input /dev/input/event3
+    chown system input /dev/input/event4
+    chown system input /dev/input/event5
+    chown system input /dev/input/event6
+    chown system input /dev/input/event7
+    chown system input /dev/input/event8
+    chown system input /dev/input/event9
+
+    chown system system /sys/class/sensor/sar_sensor/sar0_sensor/enable
+    chmod 0664 /sys/class/sensor/sar_sensor/sar0_sensor/enable
+    chown system system /sys/class/sensor/sar_sensor/sar1_sensor/enable
+    chmod 0664 /sys/class/sensor/sar_sensor/sar1_sensor/enable
+    chown system system /sys/class/sensor/sar_sensor/sar0_sensor/calibrate
+    chmod 0664 /sys/class/sensor/sar_sensor/sar0_sensor/calibrate
+    chown system system /sys/class/sensor/sar_sensor/sar1_sensor/calibrate
+    chmod 0664 /sys/class/sensor/sar_sensor/sar1_sensor/calibrate
+
+    # add for pm_debug
+    chown system system /sys/module/pm_debug/parameters/sleep_zswscnoff_state
+    chmod 0644 /sys/module/pm_debug/parameters/sleep_zswscnoff_state
+
+    chown system system /sys/module/pm_debug/parameters/sleep_zswaod_state
+    chmod 0644 /sys/module/pm_debug/parameters/sleep_zswaod_state
+
+    chown system system /sys/module/pm_debug/parameters/trigger_wakepercent
+    chmod 0644 /sys/module/pm_debug/parameters/trigger_wakepercent
+
+    chown system system /sys/module/pm_debug/parameters/time_screen_off
+    chmod 0644 /sys/module/pm_debug/parameters/time_screen_off
+
+    chown system system /sys/module/pm_debug/parameters/time_subsyswake
+    chmod 0644 /sys/module/pm_debug/parameters/time_subsyswake
+
+    chown system system /sys/module/pm_debug/parameters/time_nexttrigger
+    chmod 0644 /sys/module/pm_debug/parameters/time_nexttrigger
+
+    chown system system /sys/module/pm_debug/parameters/forcetrigger_which
+    chmod 0644 /sys/module/pm_debug/parameters/forcetrigger_which
+
+    # add for camera app acces
+    chmod 0775 /data/vendor/camera
+
+    # add for wls pen shipmode
+    chmod 0666 /sys/module/zte_misc/parameters/enable_wls_tx_pen_shipmode
+
+#add i2c permissions
+on post-fs
+   mkdir /mnt/vendor/persist/keybox 0755 root root
+   mkdir /persist/omadm 0755 root root
+
+   #add for IR
+   setprop ro.hardware.consumerir zte
+    # for zte_props_concat
+    # call restorecon on hml_version here.
+    # hml_version will be used to generate the final value of zte_props.
+    # STEP 1:
+    # zte_props should be erased in function PropertyLoadBootDefaults.
+    # then init process read hml_version and set these props according to hml_version's content.
+    # so hml_version's context must be restored early enough to guarantee init a read access.
+    chmod 664 /sys/nubia_hw_version/hml_version
+    chown system system /sys/nubia_hw_version/hml_version
+    restorecon /sys/nubia_hw_version/hml_version
+    restorecon /sys/nubia_hw_version/pcb_version
+    # STEP 2:
+    # ro.vendor.product.ztename is necessary to enable adb service. refer "init.qcom.usb.rc".
+    # if ztename is erased, it must be set before used by usb.
+    # setting it too late can cause adb failure, do it right after hml_version's context is set.
+    # concat_props_zte is mapped to a BuildinFunction defined by zte to generate and set zte_props.
+    # Make sure concat_props_zte is mapped to a BuildinFunction.
+    concat_props_zte
+
+on mmi && property:ro.bootmode=ffbm-02
+    chown system system /dev/i2c-8
+    chmod 0666 /dev/i2c-8
+    chmod 0666 /sys/devices/platform/soc/988000.i2c/i2c-2/2-0034/reg
+    chmod 0666 /sys/devices/platform/soc/988000.i2c/i2c-2/2-0034/rw
+    chmod 0666 /sys/devices/platform/soc/988000.i2c/i2c-2/2-0035/reg
+    chmod 0666 /sys/devices/platform/soc/988000.i2c/i2c-2/2-0035/rw
+    setprop persist.dbg.keep_debugfs_mounted 1
+
+on property:persist.odm.sys.pmicregdump=0
+     write /sys/module/zte_misc/parameters/enable_to_dump_reg 0
+     write /sys/class/qcom-battery/adsp_debug 0
+
+on property:persist.odm.sys.pmicregdump=1
+     write /sys/module/zte_misc/parameters/enable_to_dump_reg 1
+     write /sys/class/qcom-battery/adsp_debug 1
+
+on property:odm.force_warm_reset=0
+    write /sys/module/msm_poweroff/parameters/restart_type 0
+
+on property:odm.force_warm_reset=1
+    write /sys/module/msm_poweroff/parameters/restart_type 1
+
+    #add for tp
+    chown system system /proc/touchscreen/wake_gesture
+    chmod 644 /proc/touchscreen/wake_gesture
+
+on property:persist.odm.sys.minidump=0
+     write /sys/kernel/dload/dload_mode full
+     write /sys/kernel/dload/emmc_dload 0
+
+on property:persist.odm.sys.minidump=1
+     write /sys/kernel/dload/dload_mode mini
+     write /sys/kernel/dload/emmc_dload 1
+
+# add diag_socket_log
+#
+service diag_socket_log /system/bin/diag_socket_log.sh
+    user root
+    disabled
+    oneshot
+
+on property:sys.diag_socket_log.enable=1
+    start diag_socket_log
+
+on property:sys.diag_socket_log.enable=0
+    stop diag_socket_log
+#zte lcd backlight reduce
+on property:persist.sys.lcd.backlight_ratio=*
+    write /sys/lcd_backlight_reduce/lcd_backlight ${persist.sys.lcd.backlight_ratio}
+
+on property:sys.demochargingpolicy.protect=1
+    write /sys/module/zte_misc/parameters/demo_charging_policy 1
+on property:sys.demochargingpolicy.protect=0
+    write /sys/module/zte_misc/parameters/demo_charging_policy 0
+
+on property:persist.sys.keeppower.anyway=1
+    setprop persist.sys.overtemp.enable 0
+    write /sys/module/zte_misc/parameters/demo_charging_policy 1
+    write /sys/module/zte_misc/parameters/policy_lowtemp_en 0
+on property:persist.sys.keeppower.anyway=0
+    setprop persist.sys.overtemp.enable 1
+    write /sys/module/zte_misc/parameters/demo_charging_policy 0
+    write /sys/module/zte_misc/parameters/policy_lowtemp_en 1
+
+on property:persist.sys.expiredchargingpolicy.protect=1
+    write /sys/module/zte_misc/parameters/expired_policy_en 1
+on property:persist.sys.expiredchargingpolicy.protect=0
+    write /sys/module/zte_misc/parameters/expired_policy_en 0
+
+on property:sys.driverchargingpolicy.protect=1
+    write /sys/module/zte_misc/parameters/driver_charging_policy 1
+on property:sys.driverchargingpolicy.protect=0
+    write /sys/module/zte_misc/parameters/driver_charging_policy 0
+
+service brd_normal /vendor/bin/battery_record_daemon normal
+    class brd_normal
+    user root
+    group root system
+
+service brd_charger /vendor/bin/battery_record_daemon charger
+    class brd_charger
+    user root
+    group root system
+
+on property:persist.sys.tskin=*
+    setprop persist.vendor.tskin ${persist.sys.tskin}
+    restart thermal-engine
+    restart vendor.thermal-engine
+
+on property:debug.oem.thermctl=*
+    restart thermal-engine
+    restart vendor.thermal-engine
+
+on property:sys.thermal.mode_type=*
+    setprop vendor.thermal.mode_type ${sys.thermal.mode_type}
+    restart thermal-engine
+    restart vendor.thermal-engine
+
+on property:persist.sys.emode.thermal=1
+    start thermal-engine
+    start vendor.thermal-engine
+
+on property:persist.sys.emode.thermal=0
+    stop thermal-engine
+    stop vendor.thermal-engine
+
+# add for emode leds test
+on property:sys.led_green.brightness=1
+    write /sys/class/leds/green/brightness 255
+    write /sys/class/leds/aw22xxx_led/effect 0x63
+    write /sys/class/leds/aw22xxx_led/cfg 1
+on property:sys.led_green.brightness=0
+    write /sys/class/leds/green/brightness 0
+
+on property:sys.led_red.brightness=1
+    write /sys/class/leds/red/brightness 255
+    write /sys/class/leds/aw22xxx_led/effect 0x60
+    write /sys/class/leds/aw22xxx_led/cfg 1
+on property:sys.led_red.brightness=0
+    write /sys/class/leds/red/brightness 0
+    write /sys/class/leds/aw22xxx_led/effect 0
+    write /sys/class/leds/aw22xxx_led/cfg 1
+
+on property:sys.led_blue.brightness=1
+    write /sys/class/leds/blue/brightness 255
+    write /sys/class/leds/aw22xxx_led/effect 0x64
+    write /sys/class/leds/aw22xxx_led/cfg 1
+on property:sys.led_blue.brightness=0
+    write /sys/class/leds/blue/brightness 0
+
+on property:sys.fanlight.cfg=1
+    write /sys/class/leds/aw22xxx_led/effect 1
+    write /sys/class/leds/aw22xxx_led/cfg 1
+on property:sys.fanlight.cfg=0
+    write /sys/class/leds/aw22xxx_led/effect 2
+    write /sys/class/leds/aw22xxx_led/cfg 1
+
+on property:sys.emode.fingerprint.test=true
+    write /mnt/vendor/persist/goodix/enable_test 1
+    chmod 666 /mnt/vendor/persist/goodix/enable_test
+on property:sys.emode.fingerprint.test=false
+    rm /mnt/vendor/persist/goodix/enable_test
+
+on property:sys.thermal.wifi.5G=1
+    setprop vendor.thermal.mode_type 3
+    restart thermal-engine
+    restart vendor.thermal-engine
+
+on property:sys.thermal.wifi.5G=0
+    setprop vendor.thermal.mode_type ${sys.thermal.mode_type}
+    restart thermal-engine
+    restart vendor.thermal-engine
+
+#add for dual
+on property:persist.zte.dualthermal.enable=0
+    stop thermal-engine
+    stop vendor.thermal-engine
+
+on property:persist.zte.dualthermal.enable=1
+    start thermal-engine
+    start vendor.thermal-engine
+
+on property:persist.zte.dualzperf.enable=0
+   stop zperf-hal-1-0
+
+on property:persist.zte.dualzperf.enable=1
+   start zperf-hal-1-0
+
+#zperf
+on property:vendor.thermal.mode_type=* && property:ro.vendor.feature.zte_feature_zperf=true
+    restart thermal-engine
+    restart vendor.thermal-engine
+
+on post-fs-data
+    # DTS_EAGLE START
+    mkdir /data/vendor/audio/dts 0771 media audio
+    copy /data/vendor/audio/dts/dts_audio_settings /data/vendor/audio/dts/temp
+    copy /vendor/etc/dts/dts_audio_settings /data/vendor/audio/dts/dts_audio_settings
+    copy /data/vendor/audio/dts/temp /data/vendor/audio/dts/dts_audio_settings
+    rm /data/vendor/audio/dts/temp
+    chown audioserver audio /data/vendor/audio/dts/dts_audio_settings
+    setprop ro.vendor.dts.licensepath "/vendor/etc/dts/"
+    setprop ro.vendor.dts.cfgpath "/vendor/etc/dts/"
+    setprop vendor.dts.audio.allow_offload true
+    # DTS_EAGLE END
+    # aw210xx led
+    chmod 0660 /sys/class/leds/aw210xx_led/groupcolor
+    chown system system /sys/class/leds/aw210xx_led/groupcolor
+    chmod 0660 /sys/class/leds/aw210xx_led/breathcolor
+    chown system system /sys/class/leds/aw210xx_led/breathcolor
+    chmod 0660 /sys/class/leds/aw210xx_led/dancecolor
+    chown system system /sys/class/leds/aw210xx_led/dancecolor
+    # aw22xxx led
+    chown system system /sys/class/leds/aw22xxx_led/reg
+    chown system system /sys/class/leds/aw22xxx_led/hwen
+    chown system system /sys/class/leds/aw22xxx_led/fw
+    chown system system /sys/class/leds/aw22xxx_led/cfg
+    chown system system /sys/class/leds/aw22xxx_led/effect
+    chown system system /sys/class/leds/aw22xxx_led/imax
+    chown system system /sys/class/leds/aw22xxx_led/rgb
+    chown system system /sys/class/leds/aw22xxx_led/task0
+    chown system system /sys/class/leds/aw22xxx_led/task1
+    chown system system /sys/class/leds/aw22xxx_led/brightness
+    chown system system /sys/class/leds/aw22xxx_led/max_brightness
+    chown system system /sys/class/leds/aw22xxx_led/para
+    chown system system /sys/class/leds/aw22xxx_led/pattern
+
+    chmod 666 /sys/class/leds/aw22xxx_led/reg
+    chmod 666 /sys/class/leds/aw22xxx_led/hwen
+    chmod 666 /sys/class/leds/aw22xxx_led/fw
+    chmod 666 /sys/class/leds/aw22xxx_led/cfg
+    chmod 666 /sys/class/leds/aw22xxx_led/effect
+    chmod 666 /sys/class/leds/aw22xxx_led/imax
+    chmod 666 /sys/class/leds/aw22xxx_led/rgb
+    chmod 666 /sys/class/leds/aw22xxx_led/task0
+    chmod 666 /sys/class/leds/aw22xxx_led/task1
+    chmod 666 /sys/class/leds/aw22xxx_led/brightness
+    chmod 666 /sys/class/leds/aw22xxx_led/max_brightness
+    chmod 666 /sys/class/leds/aw22xxx_led/para
+    chmod 666 /sys/class/leds/aw22xxx_led/pattern
+    
+    chmod 0755 mnt/vendor/persist/fan_light
+    chown system system mnt/vendor/persist/fan_light
+    chmod 664 /sys/nubia_hw_version/charge_version
+    chown system system /sys/nubia_hw_version/charge_version
+    restorecon /sys/nubia_hw_version/charge_version
+
+on property:sys.led.logo.switch=1
+    write /sys/class/leds/red/breath_feature "1 0 0 0 100 255 3"
+on property:sys.led.logo.switch=0
+    write /sys/class/leds/red/breath_feature "0 0 0 0 100 255 3"
+
+on property:sys.keypad.wakeup.switch=1
+    write sys/devices/platform/soc/a8c000.i2c/i2c-5/5-0010/mode "1"
+    write sys/devices/platform/soc/998000.i2c/i2c-4/4-0010/mode "1"
+on property:sys.keypad.wakeup.switch=0
+    write sys/devices/platform/soc/a8c000.i2c/i2c-5/5-0010/mode "0"
+    write sys/devices/platform/soc/998000.i2c/i2c-4/4-0010/mode "0"
+
+on property:persist.oem.battery.type=1
+   write /sys/class/qcom-battery/oem_battery_type 1
+
+on property:persist.odm.reset.source.sink=1
+    write /sys/bus/coresight/reset_source_sink 1
+
+service zswqrtr_lookup /vendor/bin/qrtr-lookup
+    user root
+    disabled
+    oneshot
+    group system root
+
+on property:persist.odm.getqrtr.lookup=1
+    start zswqrtr_lookup
+
+service shutdownanim /system/bin/bootanimation -s
+    class core animation
+    user root
+    group root graphics audio system
+    disabled
+    oneshot
+    writepid /dev/stune/top-app/tasks
+
+# zram writeback for vendor_qti_init_shell sepolicy
+on property:persist.zte.mindsync.zram.wb_enabled=true
+    setprop persist.vendor.mindsync.zram.wb_enabled true
+
+on property:persist.zte.mindsync.zram.wb_enabled=false
+    setprop persist.vendor.mindsync.zram.wb_enabled false
+
+#zsw tcpip
+on property:vendor.MB.running=0
+    setprop persist.shell.tcpip.debug 0
+
+on property:vendor.MB.running=1
+    setprop persist.shell.tcpip.debug 3
+
+on property:persist.shell.tcpip.debug=0
+    write /proc/driver/debug/tcp_output_debug/enable_debug 0
+    write /sys/module/pm_debug/parameters/tcp_output_debug 0
+
+on property:persist.shell.tcpip.debug=1
+    write /proc/driver/debug/tcp_output_debug/enable_debug 1
+    write /sys/module/pm_debug/parameters/tcp_output_debug 1
+
+on property:persist.shell.tcpip.debug=2
+    write /proc/driver/debug/tcp_output_debug/enable_debug 2
+    write /sys/module/pm_debug/parameters/tcp_output_debug 2
+
+on property:persist.shell.tcpip.debug=3
+    write /proc/driver/debug/tcp_output_debug/enable_debug 3
+    write /sys/module/pm_debug/parameters/tcp_output_debug 3
+
+on property:persist.shell.tcpip.debug=4
+    write /proc/driver/debug/tcp_output_debug/enable_debug 4
+    write /sys/module/pm_debug/parameters/tcp_output_debug 4
+
+on property:persist.shell.tcpip.debug=7
+    write /proc/driver/debug/tcp_output_debug/enable_debug 7
+    write /sys/module/pm_debug/parameters/tcp_output_debug 7
+
+service tcpip_attach /system_ext/bin/tcpip_attach_detach
+    class late_start
+    user root
+    disabled
+    oneshot
+
+service tcpip_dettach /system_ext/bin/tcpip_attach_detach -q
+    class late_start
+    user root
+    disabled
+    oneshot
+
+service tcpcat_poll /system_ext/bin/tcpcat
+    class late_start
+    user root
+    disabled
+    oneshot
+
+on property:vendor.post_boot.zramwb=1 && property:persist.zte.mindsync.zram.wb_enabled=true && property:sys.mindsync.zram.init=""
+    swapon_all /vendor/etc/fstab.enableswap_wb_${vendor.post_boot.zram_size}_${persist.zte.mindsync.zram.wb_size}
+    chown root system /sys/block/zram0/writeback_limit
+    chmod 0664 /sys/block/zram0/writeback_limit
+    chown root system /sys/block/zram0/writeback_limit_enable
+    chmod 0664 /sys/block/zram0/writeback_limit_enable
+    setprop sys.mindsync.zram.init 1
+
+# add for tp module 
+on property:persist.vendor.sys.singletap=1
+  write /proc/touchscreen/single_tap 1
+on property:persist.vendor.sys.fingerlockflag=1
+  write /proc/touchscreen/finger_lock_flag 1
+on property:persist.vendor.sys.tp_palm_mode=1
+  write /proc/touchscreen/tp_palm_mode 1
+on property:persist.vendor.sys.tp_palm_mode=0
+  write /proc/touchscreen/tp_palm_mode 0
+
+on property:persist.vendor.ssr.restart_level=ALL_DISABLE
+    write /sys/kernel/cnss/recovery 0
+
+on property:persist.vendor.ssr.restart_level=ALL_ENABLE
+    write /sys/kernel/cnss/recovery 1
+
+on post-fs-data
+    # sensors sensitivity
+    chown system system /sys/class/sensors_sensitivity/accel/accel_enable
+    chown system system /sys/class/sensors_sensitivity/accel/accel_x
+    chown system system /sys/class/sensors_sensitivity/accel/accel_y
+    chown system system /sys/class/sensors_sensitivity/accel/accel_z
+    chown system system /sys/class/sensors_sensitivity/gyro/gyro_enable
+    chown system system /sys/class/sensors_sensitivity/gyro/gyro_x
+    chown system system /sys/class/sensors_sensitivity/gyro/gyro_y
+    chown system system /sys/class/sensors_sensitivity/gyro/gyro_z
+
+    chmod 0664 /sys/class/sensors_sensitivity/accel/accel_enable
+    chmod 0664 /sys/class/sensors_sensitivity/accel/accel_x
+    chmod 0664 /sys/class/sensors_sensitivity/accel/accel_y
+    chmod 0664 /sys/class/sensors_sensitivity/accel/accel_z
+    chmod 0664 /sys/class/sensors_sensitivity/gyro/gyro_enable
+    chmod 0664 /sys/class/sensors_sensitivity/gyro/gyro_x
+    chmod 0664 /sys/class/sensors_sensitivity/gyro/gyro_y
+    chmod 0664 /sys/class/sensors_sensitivity/gyro/gyro_z
