@@ -8,7 +8,20 @@ DEVICE_PATH := device/nubia/NX769J
 
 # A/B
 AB_OTA_UPDATER := true
-AB_OTA_PARTITIONS +=
+AB_OTA_PARTITIONS += \
+    boot \
+    dtbo \
+    init_boot \
+    odm \
+    product \
+    recovery \
+    system \
+    system_dlkm \
+    system_ext \
+    vbmeta \
+    vendor \
+    vendor_boot \
+    vendor_dlkm
 BOARD_USES_RECOVERY_AS_BOOT := true
 
 # Architecture
